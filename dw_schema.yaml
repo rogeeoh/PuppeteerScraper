@@ -1,0 +1,17 @@
+texts:
+    - type: title
+      from: ....
+    - type: date
+      from: ....
+  media:
+    - type: thumbnail
+      web: html (frame:#framdId)
+      selector: tr > .... (div> dd> dd)
+      attribute: onclick(src, href)
+      download: true(false)
+  
+    - type: video
+      web: html (page)
+      selector: tr > .... (div> dd> dd)
+      attribute: onclick(src, href)
+      download: true(false)
