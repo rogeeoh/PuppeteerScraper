@@ -58,8 +58,8 @@ const parsed = {
             isArray: false,
             from: {
                 context: 'Context',
-                xpathOne: '//*[@id="rso"]/div[3]/div/div/a/h3/span',
-                waitForXpath: '//*[@id="rso"]/div[3]/div/div/a/h3/span',
+                xPath: '//*[@id="rso"]/div[3]/div/div/a/h3/span',
+                waitForXPath: '//*[@id="rso"]/div[3]/div/div/a/h3/span',
                 evaluate: 'textContent'
             }
         },

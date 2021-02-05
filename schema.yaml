@@ -1,5 +1,7 @@
 # type 종류: String, Match, Date, Number, Integer, Static
-# from: context, selector || xpath
+# from: context, selector || xPath
+# onError.policy: Static, Alternative, Callback, Skip
+
 
 elements:
   title:
@@ -10,17 +12,18 @@ elements:
       evaluate: textContent               # 기본값 생략가능
     onError:
       - policy: Alternative
-        type: String
         from:
           context: Context
           selector: div.card-title2
-          waitForSelector: div.card-title2
+          waitForSelector: div.card-title2'
       - policy: Skip                      # retry(n): n번 시도 후 같은 에러 발생시 종료, skip(n) 다음 항목 실행
 
-#  sub_title:
-#    inherit: title                        # sameAs => title과 수집방식이 같음
-#    onError:
-#      - policy: Skip
+  sub_title:
+    inherit: writer                        # sameAs => title과 수집방식이 같음
+    from:
+      selector: div.sub_title
+    onError:
+      - policy: Skip
 
   writer: div.card-writer                 # String 타입에 Context에 selector인 상황이라면 이렇게 줄여쓰는 것도 가능
 
@@ -45,13 +48,13 @@ elements:
     regex: yyyy-mm-dd
     from: 
       context: Context
-      xpath: //*[@id="rso"]/dv[3]/div/div/a/h3/span    # xpath는 배열을 리턴하지만 type에 의해 최종적으로 결정됨
-      waitForXpath: //*[@id="rso"]/div[3]/div/div/a/h3/span
+      xPath: //*[@id="rso"]/dv[3]/div/div/a/h3/span    # xPath는 배열을 리턴하지만 type에 의해 최종적으로 결정됨
+      waitForXPath: //*[@id="rso"]/div[3]/div/div/a/h3/span
     
   video_link:
     from: 
       context: Frame
-#      frameSelector: '#videoFrame'      # frameSelector는 selector 형식만 지원
+      frameSelector: '#videoFrame'      # frameSelector는 selector 형식만 지원
       selector: div.video > video
       evaluate:
         getAttribute: src
@@ -71,7 +74,7 @@ elements:
   site_name:
     staticValue: 금융감독원
 
-collect: 
+collect:
   main:
     - title
     - writer, date                    # 붙여쓰기 가능

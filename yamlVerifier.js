@@ -32,6 +32,27 @@ const CONTEXT_TYPES = {
     CALLBACK: 'Callback',
 };
 
+const ON_ERROR_POLICIES = {
+    STATIC_VALUE: 'StaticValue',
+    ALTERNATIVE: 'Alternative',
+    CALLBACK: 'Callback',
+    SKIP: 'Skip'
+};
+
+
+const defaultSetting = {
+    createDefaultSetting: () => ({
+        type: 'String',
+        isRequired: true,
+        isArray: false,
+    }),
+    createDefaultFrom: () => ({
+        context: 'Context',
+        evaluate: 'textContent'
+    }),
+    createDefaultOnError: () => [],
+};
+
 
 const verifyYaml = (yaml) => {
     const parseResult = {
@@ -41,43 +62,56 @@ const verifyYaml = (yaml) => {
 
     const {elements, collect, ...etc} = yamlParser(yaml);
 
-    try {
-        // schema 종류들을 다 가져온다
-        const elementNames = Object.keys(elements);
-        for (const elementName of elementNames) {
-            const element = elements[elementName];
-            try {
-                parseResult.elements[elementName] = verifySchema(element);
-            } catch (err){
-                console.error(`${elementName} parse error`);
-                throw err;
+    const elementsArray = Object.keys(elements);
+    while (elementsArray.length !== 0) {
+        // 제일 앞을 하나씩 빼온다
+        const elementName = elementsArray.shift();
+        const element = elements[elementName];
+        try {
+            // Case1: 상속받는 값이 있고, 이미 파싱이 된 경우 (진행이 가능한 경우)
+            if (element.inherit && parseResult.elements[element.inherit]) {
+                parseResult.elements[elementName] = verifySchema(element, parseResult.elements[element.inherit]);
             }
+            // Case2: 상속받는 값이 있으나, Schema에 정의가 되지 않은 경우 (에러)
+            else if (element.inherit && !Object.keys(elements).includes(element.inherit)) {
+                throw new Error(`inherit error: ${elementName} inherits undefined schema: ${element.inherit}`);
+            }
+            // Case3: 상속받는 값이 있으나, 파싱이 아직 안 된 경우 (이따가 진행하면 될 경우)
+            else if (element.inherit && !parseResult.elements[element.inherit]) {
+                elementsArray.push(elementName);
+                continue;
+            }
+            // Case4: 상속을 받지 않는 경우 (일반적인 경우)
+            else {
+                parseResult.elements[elementName] = verifySchema(element)
+            }
+        } catch (err) {
+            console.error(`${elementName} parse error`);
+            throw err;
         }
-
-        console.log(util.inspect(parseResult, false, null, true));
-
-        // const schemaKeys = Object.keys(parseResult.schema);
-
-        // for (const collectElement of collect) {
-        //     // 만약 collect의 수집하는 elements가 없다면 (빈 배열이라면) null 대신 빈 배열로 초기화해준다.
-        //     collectElement.elements = collectElement.elements === null ? [] : collectElement.elements;
-        //     collectElement.elements = collectElement.elements === '[]' ? [] : collectElement.elements;
-        //     collectElement.elements = collectElement.elements === 'null' ? [] : collectElement.elements;
-        //
-        //     const collectElementName = collectElement.name;
-        //     const collectElements = collectElement.elements;
-        //
-        //     verifyCollect(collectElement, schemaKeys);
-        //
-        //     parseResult.collect[collectElementName] = collectElements;
-        // }
-    } catch (err) {
-        console.error(err);
-        throw new Error(err.message);
     }
 
+    if (!collect)
+        throw new Error('collect undefined error: collect is not defined in schema');
+    const collectKeys = Object.keys(collect);
+    for (const key of collectKeys) {
+        parseResult.collect[key] = verifyCollect(collect[key], Object.keys(elements));
+    }
+
+    // collect에 안들어간 element가 있다면 warning을 띄워준다
+    const everyCollectKeys = [];
+    for (const key of collectKeys) {
+        everyCollectKeys.push(...parseResult.collect[key]);
+    }
+    Object.keys(elements).forEach(key => {
+        if(everyCollectKeys.indexOf(key) === -1)
+            console.warn(`WARNING: ${key} is defined in elements but never used in collect`);
+    });
+
+    console.log(util.inspect(parseResult, false, null, true));
+
     // 기타 설정을 etc에 넣을 수 있도록 수정
-    // return {schema: parseResult.schema, collect: parseResult.collect, ...etc};
+    return {schema: parseResult.schema, collect: parseResult.collect, ...etc};
 };
 
 // elementType에 해당하는지 체크하고, 해당하지 않는다면 null을 리턴
@@ -100,24 +134,6 @@ const getContextType = (type) => {
     return null;
 };
 
-
-/**
- * verifyElemelt시 defaultSetting을 만들어주는 역
- * @type {{createDefaultFrom: (function(): {context: string, evaluate: string}), createDefaultSetting: (function(): {isRequired: boolean, isArray: boolean, type: string})}}
- */
-const defaultSetting = {
-    createDefaultSetting: () => ({
-        type: 'String',
-        isRequired: true,
-        isArray: false,
-        from: {
-            context: 'Context',
-            evaluate: 'textContent',
-        },
-        onError: [],
-    }),
-};
-
 const parseType = (elementType) => {
     const type = getElementType(elementType);
     if (!type)
@@ -131,11 +147,19 @@ const parseType = (elementType) => {
     return {type, isRequired, isArray};
 };
 
-const verifySchema = element => {
-    const verified = defaultSetting.createDefaultSetting();
+const verifySchema = (element, inheritElement) => {
+    // staticValue를 가진 inheritElement는 상속받을 수 없음 (정책상)
+    if (inheritElement && inheritElement.staticValue) {
+        throw new Error(`Inherit error: cannot inherit staticValue element`);
+    }
+    // inheritElement로부터 상속여부 결정
+    const verified = inheritElement
+        ? JSON.parse(JSON.stringify(inheritElement))
+        : defaultSetting.createDefaultSetting();
 
     // element가 string으로 들어오면 selector을 이용하는 경우; onError조차 없는 상황
     if (typeof element === 'string') {
+        verified.from = defaultSetting.createDefaultFrom();
         verified.from.selector = element;
         return verified;
     }
@@ -164,84 +188,146 @@ const verifySchema = element => {
             }
         } // end if element.type
 
-        // element.from은 현재 루틴에 반드시 있어야 함
-        if (!element.from)
+        // 상속받는게 아니라면 element.from은 현재 루틴에 반드시 있어야 함
+        if (!element.from && !inheritElement)
             throw new Error(`'from' is not defined: must define from`);
-
-        // element.from에 string값이 들어있다면 기본 selector로 활용
-        if (typeof element.from === 'string'){
-            verified.from.selector = element.from;
-            delete verified.from.xpath;
+        // from을 재정의 하지 않고 상속만 받는 경우
+        else if (!element.from && inheritElement) {
+            verified.from = inheritElement.from;
         }
-        // context가 정의되어 있으면 변경
-        else if (element.from.context) {
-            const context = getContextType(element.from.context);
-            if (!context)
-                throw new Error(`Unknown from.context error: ${element.from.context}`);
-            verified.from.context = context;
-
-            // context가 Frame이라면 반드시 frameSelector가 있어야 하므로 확인
-            if (verified.from.context === CONTEXT_TYPES.FRAME){
-                if (!element.from.frameSelector)
-                    throw new Error(`Frame from.frameSelector undefined error: must define frameSelector`);
-                verified.from.frameSelector = element.from.frameSelector;
-            }
-
-            // Case 1: context: Callback인 경우
-            if (verified.from.context === CONTEXT_TYPES.CALLBACK){
-                // Callback인데 name이 없는 경우 에러 발생
-                if (!element.from.name)
-                    throw new Error(`Callback from.name undefined error: must define name`);
-                verified.from.name = element.from.name
-                delete verified.from.evaluate;
-            }
-            // Case 2: selector를 이용하는 경우
-            else if (element.from.selector){
-                verified.from.selector = element.from.selector;
-                // evaluate가 정의되어 있다면 교체해준다
-                if (element.from.evaluate)
-                    verified.from.evaluate = element.from.evaluate
-            }
-            // Case 3: xpath를 이용하는 경
-            else if (element.from.xpath){
-                verified.from.xpath = element.from.xpath;
-                // evaluate가 정의되어 있다면 교체해준다
-                if (element.from.evaluate)
-                    verified.from.evaluate = element.from.evaluate
-            }
-            // Case 4: (오류)Callback이 아닌데 selector도, xpath도 없는 상황
-            else {
-                throw new Error(`selector or xpath not exist error: from must have selector or xpath`);
-            }
-        } // end else if (element.from.context)
+        // 상속을 받음과 동시에 재정의 하는 경우
+        else {
+            verified.from = parseFrom(element.from);
+        }
     } // end else
 
+
     // 정의된 onError가 있다면 처리해준다.
-    // TODO: onError 파싱 및 처리
-    if (element.onError)
-        verified.onError = element.onError;
+    if (element.onError) {
+        verified.onError = [];
+
+        // 에러가 배열로 들어오기 때문에 순회해준다
+        for (const onError of element.onError) {
+            const error = {};
+            // error에 policy가 없으면 오류 발생
+            if (!onError.policy)
+                throw new Error(`onError policy is not defined`);
+
+            // policy에 따라 정책 결정
+            switch (onError.policy) {
+                case ON_ERROR_POLICIES.STATIC_VALUE:
+                    error.policy = ON_ERROR_POLICIES.STATIC_VALUE;
+                    if (!error.staticValue)
+                        throw new Error(`StaticValue onError.staticValue undefined error: must define staticValue`);
+                    error.staticValue = onError.staticValue;
+                    break;
+                case ON_ERROR_POLICIES.ALTERNATIVE:
+                    error.policy = ON_ERROR_POLICIES.ALTERNATIVE;
+                    error.from = parseFrom(onError.from);
+                    break;
+                case ON_ERROR_POLICIES.CALLBACK:
+                    error.policy = ON_ERROR_POLICIES.CALLBACK;
+                    if (!onError.name)
+                        throw new Error(`Callback onError.name undefined error: must define name`);
+                    error.name = onError.name;
+                    break;
+                case ON_ERROR_POLICIES.SKIP:
+                    error.policy = ON_ERROR_POLICIES.SKIP;
+                    break;
+                default:
+                    throw new Error(`onError unknown policy error: ${error.policy}`);
+            }
+            verified.onError.push(error);
+        } // end for
+    } // end if element.onError
+    // 상속받은 onError만 존재할 경우
+    else if (inheritElement && inheritElement.onError) {
+        verified.onError = inheritElement.onError;
+    }
 
     return verified;
 }; // end verifySchema
 
+const parseFrom = (from) => {
+    const verifiedFrom = defaultSetting.createDefaultFrom();
 
-// const verifyCollect = (collectElement, schemaKeys) => {
-//     let collectElements = collectElement.elements;
-//
-//     // elements가 정의가 안되었는지 검사
-//     if (collectElements === null) {
-//         // throw new Error(`collect elements null: ${collectElement.name}`)
-//         console.warn(`WARNING: collect elements null: ${collectElement.name}`);
-//         collectElements = [];
-//     }
-//
-//     // collect의 element들이 schema에서 정의되었는지 확인
-//     collectElements.forEach(elementName => {
-//         if (schemaKeys.indexOf(elementName) === -1) {
-//             throw new Error(`collect element not defined in schema: ${elementName}`);
-//         }
-//     });
-// };
+    // from에 string값이 들어있다면 기본 selector로 활용하고 리턴
+    if (typeof from === 'string') {
+        verifiedFrom.selector = from;
+        return verifiedFrom;
+    }
+
+    // context가 default값(Context)이 아니고 정의되어 있으면 변경
+    if (from.context) {
+        const context = getContextType(from.context);
+        if (!context)
+            throw new Error(`Unknown from.context error: ${from.context}`);
+        verifiedFrom.context = context;
+    }
+
+    // context가 Frame이라면 반드시 frameSelector가 있어야 하므로 확인
+    if (verifiedFrom.context === CONTEXT_TYPES.FRAME) {
+        if (!from.frameSelector)
+            throw new Error(`Frame from.frameSelector undefined error: must define frameSelector`);
+        verifiedFrom.frameSelector = from.frameSelector;
+    }
+
+    // Case 1: context: Callback인 경우
+    if (verifiedFrom.context === CONTEXT_TYPES.CALLBACK) {
+        // Callback인데 name이 없는 경우 에러 발생
+        if (!from.name)
+            throw new Error(`Callback from.name undefined error: must define name`);
+        verifiedFrom.name = from.name
+        // evaluate: 'textContent'를 제거해준다
+        delete verifiedFrom.evaluate;
+    }
+    // Case 2: selector 혹은 xPath를 이용하는 경우
+    else if (from.selector || from.xPath) {
+        // 둘이 중복으로 적어준 경우에는 오류를 발생시킨다
+        if (from.selector && from.xPath)
+            throw new Error(`selector and xpath error: selector and xPath cannot exist at the same time`);
+
+        from.selector
+            ? verifiedFrom.selector = from.selector
+            : verifiedFrom.xPath = from.xPath;
+
+        // waitForSelector가 있는지 확인
+        if (from.waitForSelector)
+            verifiedFrom.waitForSelector = from.waitForSelector;
+        // waitForXPath가 있는지 확인
+        if (from.waitForXPath)
+            verifiedFrom.waitForXPath = from.waitForXPath;
+        // evaluate가 정의되어 있다면 교체해준다
+        if (from.evaluate)
+            verifiedFrom.evaluate = from.evaluate;
+    }
+    // Case 3: (오류)Callback이 아닌데 selector도, xpath도 없는 상황
+    else {
+        throw new Error(`selector or xpath not exist error: from must have selector or xpath`);
+    }
+
+    return verifiedFrom;
+};
+
+
+const verifyCollect = (elements, schemaKeys) => {
+    const collectElements = [];
+    for (const element of elements) {
+        const splits = element.split(',');
+        splits.forEach(split => {
+            collectElements.push(split.trim());
+        });
+    }
+
+    // collect의 element들이 schema에서 정의되었는지 확인
+    collectElements.forEach(elementName => {
+        if (schemaKeys.indexOf(elementName) === -1) {
+            throw new Error(`collect element not defined in schema: ${elementName}`);
+        }
+    });
+
+    return collectElements;
+};
 
 module.exports = verifyYaml;
 
