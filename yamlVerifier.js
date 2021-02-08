@@ -108,10 +108,8 @@ const verifyYaml = (yaml) => {
             console.warn(`WARNING: ${key} is defined in elements but never used in collect`);
     });
 
-    console.log(util.inspect(parseResult, false, null, true));
-
     // 기타 설정을 etc에 넣을 수 있도록 수정
-    return {schema: parseResult.schema, collect: parseResult.collect, ...etc};
+    return {elements: parseResult.elements, collect: parseResult.collect, ...etc};
 };
 
 // elementType에 해당하는지 체크하고, 해당하지 않는다면 null을 리턴
@@ -330,5 +328,3 @@ const verifyCollect = (elements, schemaKeys) => {
 };
 
 module.exports = verifyYaml;
-
-verifyYaml('./Schema.yaml');

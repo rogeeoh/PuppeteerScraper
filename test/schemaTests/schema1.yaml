@@ -50,7 +50,8 @@ elements:
       context: Context
       xPath: //*[@id="rso"]/dv[3]/div/div/a/h3/span    # xPath는 배열을 리턴하지만 type에 의해 최종적으로 결정됨
       waitForXPath: //*[@id="rso"]/div[3]/div/div/a/h3/span
-    
+
+
   video_link:
     from: 
       context: Frame
@@ -76,10 +77,12 @@ elements:
 
 collect:
   main:
-    - title
+    - title, sub_title
     - writer, date                    # 붙여쓰기 가능
   sub:
+    - content, content_html
+    - files
     - video_link
-    - url
+    - url, site_name
 
 
