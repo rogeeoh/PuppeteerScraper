@@ -1,5 +1,7 @@
 const puppeteer = require('puppeteer');
+const yamlVerifier = require('./yamlVerifier');
 const BaseScraper = require('./BaseScraper.js');
+const util = require("util");
 
 const handleData = async (data) => {
     console.log(data);
@@ -7,7 +9,7 @@ const handleData = async (data) => {
 
 const url = `https://www.clien.net/service/board/jirum`;
 
-const schema = {};
+const schema = yamlVerifier('./schema.yaml');
 
 const downloadFile = async (element) => {
     const fileName = await element.click();
@@ -26,7 +28,7 @@ const config = {
         afterLaunch: async (browser, page) => {
             // do something after browser launched
         },
-        beforeTerminate: async (browser, page) => {
+        beforeClose: async (browser, page) => {
             // do something before browser terminates
         },
     },
@@ -67,7 +69,7 @@ const config = {
     // must return value or throw error?
     onUnhandledError: async (props, error) => {
         console.error(error);
-        throw new Error(error);
+        // throw new Error(error);
     },
     options: {
         // console.log 출력 여부
@@ -78,27 +80,29 @@ const config = {
 };
 
 const crawler = BaseScraper(schema, config);
-
-/**
- * Case1: 반복이 되지 않는 경우는 loop: false로 세팅한다 (기본값)
- */
-crawler.start(async (browser, page, {collect}) => {
-    await page.goto(url, {waitUntil: 'networkidle2'});
-    const mainList = await page.$('table > tr');
-    for (const main of mainList) {
-        try {
-            const data = await collect(page, 'main');
-            // 데이터 활용
-            await handleData(data);
-        }
-            // 여기에서 잡히는 catch는 yaml에 의해 handle되지 않은 오류.
-        catch (err) {
-            console.error(err);
-        }
-    }
-});
+console.log(util.inspect(crawler, false, null, true));
 
 
+// /**
+//  * Case1: 반복이 되지 않는 경우는 loop: false로 세팅한다 (기본값)
+//  */
+// crawler.start(async (browser, page, {collect}) => {
+//     await page.goto(url, {waitUntil: 'networkidle2'});
+//     const mainList = await page.$('table > tr');
+//     for (const main of mainList) {
+//         try {
+//             const data = await collect(page, 'main');
+//             // 데이터 활용
+//             await handleData(data);
+//         }
+//             // 여기에서 잡히는 catch는 yaml에 의해 handle되지 않은 오류.
+//         catch (err) {
+//             console.error(err);
+//         }
+//     }
+// });
+//
+//
 /**
  * Case2: 반복되지 않는 경우 loop를 사용한다
  * @type {number}
@@ -107,7 +111,7 @@ let pageNumber = 1;
 // start는 1회성, loop는 stop이 될 때까지 반복한다.
 crawler.start(async (browser, page, {collect, stop}) => {
     await page.goto(`${url}?&od=T31&po=${pageNumber}`);
-    const mainList = await page.$('table > tr');
+    const mainList = await page.$$('table > tr');
     for (const main of mainList) {
         try {
             const data = await collect(page, 'main');

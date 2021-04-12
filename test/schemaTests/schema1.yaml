@@ -6,7 +6,7 @@
 elements:
   title:
     type: String                          # string(default), not array, required
-    from: 
+    from:
       context: Context                       # Context(default), Page, Frame, Callback
       selector: div.card-title
       evaluate: textContent               # 기본값 생략가능
@@ -46,20 +46,20 @@ elements:
   date:
     type: Match
     regex: yyyy-mm-dd
-    from: 
+    from:
       context: Context
       xPath: //*[@id="rso"]/dv[3]/div/div/a/h3/span    # xPath는 배열을 리턴하지만 type에 의해 최종적으로 결정됨
       waitForXPath: //*[@id="rso"]/div[3]/div/div/a/h3/span
 
 
   video_link:
-    from: 
+    from:
       context: Frame
       frameSelector: '#videoFrame'      # frameSelector는 selector 형식만 지원
       selector: div.video > video
       evaluate:
-        getAttribute: src
-  
+        getAttribute: src_js
+
   files:
     type: String[]?               # String Array, empty allowed
     from:
@@ -68,7 +68,7 @@ elements:
 
   url:
     type: String
-    from:                             # 혹은 from: Callback:getLinkUrl
+    from:                         # 혹은 from: Callback:getLinkUrl
       context: Callback
       name: getLinkUrlx
 

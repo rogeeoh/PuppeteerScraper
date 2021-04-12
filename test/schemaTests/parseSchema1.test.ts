@@ -1,12 +1,8 @@
-const verify = require('../../yamlVerifier');
-const util = require("util");
+import verify from '../../src/yamlVerifier';
+import ScraperSchema from "../../src/common/elements";
 
-
-
-
-
-describe("schema1.yaml 파싱 테스트", () => {
-    let parsed;
+describe("schema2.yaml 파싱 테스트", () => {
+    let parsed: ScraperSchema;
     test('verify 테스트', () => {
         parsed = verify('test/schemaTests/schema1.yaml')
     });

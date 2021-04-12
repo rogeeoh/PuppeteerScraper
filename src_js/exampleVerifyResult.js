@@ -11,7 +11,7 @@ const parsed = {
             },
             onError: [
                 {
-                    policy: 'Alternate',
+                    policy: 'Alternative',
                     type: 'String',
                     isRequired: true,
                     isArray: false,
@@ -101,5 +101,9 @@ const parsed = {
             isArray: false,
             staticValue: '금융감독원'
         },
+    },
+    collect: {
+        main: ['title', 'sub_title', 'writer', 'date'],
+        sub: ['content', 'content_html', 'files', 'video_link', 'url', 'site_name'],
     }
 };
