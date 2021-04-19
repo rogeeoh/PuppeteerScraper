@@ -1,6 +1,6 @@
 // import ElementType from "../../src/statics/ElementType";
 // import ScraperElement from "../../src/interfaces/ScraperElement";
-import {ElementType, FromContextType} from "../../src/common/types";
+import {ElementDataType, FromContextType} from "../../src/common/types";
 import {ElementFrom} from "../../src/common/elements";
 
 

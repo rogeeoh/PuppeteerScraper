@@ -1,6 +1,6 @@
 import yamlParser from './yamlParser';
-import ScraperSchema from "./common/elements";
-import {ElementType} from "./common/types";
+import ScraperSchema from "../common/elements";
+import {ElementDataType} from "../common/types";
 
 const ELEMENT_TYPES = {
     STRING: 'String',
@@ -100,11 +100,11 @@ const verifyYaml = (yaml: string): ScraperSchema => {
 };
 
 // elementType에 해당하는지 체크하고, 해당하지 않는다면 null을 리턴
-const getElementType = (type: string): ElementType | undefined => {
+const getElementType = (type: string): ElementDataType | undefined => {
     const elemKeys: string[] = Object.keys(ELEMENT_TYPES);
     for (const elemKey of elemKeys) {
         // @ts-ignore
-        const elemType :ElementType = ELEMENT_TYPES[elemKey];
+        const elemType :ElementDataType = ELEMENT_TYPES[elemKey];
         if (type.startsWith(elemType)) return elemType;
     }
     return undefined;

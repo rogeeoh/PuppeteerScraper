@@ -1,4 +1,4 @@
-import verify from '../../src/yamlVerifier';
+import verify from '../../src/utils/yamlVerifier';
 import ScraperSchema from "../../src/common/elements";
 
 describe("schema2.yaml 파싱 테스트", () => {

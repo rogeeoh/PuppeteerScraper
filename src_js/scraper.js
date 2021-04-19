@@ -60,7 +60,7 @@ const config = {
     },
     callback: {
         getLinkUrl: ({page}) => page.url(),
-        onContentError: async (props, error) => {
+        onContentError: async (props) => {
             console.error(error);
             // null을 리턴
             return null;
@@ -82,27 +82,6 @@ const config = {
 const crawler = BaseScraper(schema, config);
 console.log(util.inspect(crawler, false, null, true));
 
-
-// /**
-//  * Case1: 반복이 되지 않는 경우는 loop: false로 세팅한다 (기본값)
-//  */
-// crawler.start(async (browser, page, {collect}) => {
-//     await page.goto(url, {waitUntil: 'networkidle2'});
-//     const mainList = await page.$('table > tr');
-//     for (const main of mainList) {
-//         try {
-//             const data = await collect(page, 'main');
-//             // 데이터 활용
-//             await handleData(data);
-//         }
-//             // 여기에서 잡히는 catch는 yaml에 의해 handle되지 않은 오류.
-//         catch (err) {
-//             console.error(err);
-//         }
-//     }
-// });
-//
-//
 /**
  * Case2: 반복되지 않는 경우 loop를 사용한다
  * @type {number}
