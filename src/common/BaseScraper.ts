@@ -1,17 +1,22 @@
-import {Browser, ElementHandle, Page} from 'puppeteer';
+import puppeteer, {Browser, ElementHandle, Page} from 'puppeteer';
 import ScraperSchema, {ElementFrom} from "./elements";
 import {
-    CollectDataType, OnCollectingType, OnCollectingTypeValue, OnErrorStrategyType,
+    CollectDataType,
+    CustomScraperConfig,
+    OnCollectingTypeValue,
+    OnErrorStrategyType,
     ScrapeOption,
     ScraperAsset,
     ScraperBrowserConfig,
     ScraperConfig,
-    ScraperContextType, ScraperElementType, ScraperPropType,
+    ScraperContextType,
+    ScraperElementType,
+    ScraperPropType,
     ScraperStatus
 } from "./types";
 
 /**
- * TODO: 1) yaml에 evaluate 처리할 수 있도록 코드 수정
+ * TODO:
  * 2) onError, callback 잘 도는지 확인
  * 3) xPath, waitForXPath 등도 잘 동작하는지 확인
  * 4) 데이터 타입이 의도한대로 들어갔는지 확인하는거 구현
@@ -24,12 +29,38 @@ class BaseScraper {
     private puppeteerAssets: ScraperAsset;
     private status: ScraperStatus;
     private stop: () => void;
-    // private collect: (context: any, group: any) => any | any[];
-    // private selectElementMethod: (schema: ScraperElementType, context: ScraperContextType) => Promise<ElementHandle | ElementHandle[] | undefined>;
 
-    constructor(schema: ScraperSchema, config: ScraperConfig) {
+    private createDefaultConfig(config: CustomScraperConfig): ScraperConfig {
+        const defaultBrowser: ScraperBrowserConfig = {
+            module: puppeteer,
+            launch: {
+                headless: process.env.NODE_ENV === "production",
+                defaultViewport: null,
+                args: [
+                    '--window-size=1366,768',
+                    '--no-sandbox',
+                    '--disable-gpu',
+                    '--single-process',
+                    '--no-zygote',
+                ],
+            }
+        };
+        const defaultOnUnhandledError = async (props: ScraperPropType, error: any) => {
+            console.error(error);
+        };
+
+        return {
+            browser: {...defaultBrowser, ...config.browser} || defaultBrowser,
+            onCollecting: config.onCollecting || {},
+            callback: config.callback || {},
+            onUnhandledError: config.onUnhandledError || defaultOnUnhandledError,
+            options: config.options || undefined,
+        };
+    }
+
+    constructor(schema: ScraperSchema, config: CustomScraperConfig) {
         this.schema = schema;
-        this.config = config;
+        this.config = this.createDefaultConfig(config);
 
         // @ts-ignore
         this.puppeteerAssets = {};
@@ -153,7 +184,7 @@ class BaseScraper {
                     ? await onCollecting(props, defaultEvent, elementHandle)
                     : await defaultEvent(props);
             }
-            // handle error
+                // handle error
             catch (defaultEventError) {
                 console.error(`defaultEvent or onCollecting Error: ${elementName}`);
                 console.error(defaultEventError);
@@ -168,7 +199,7 @@ class BaseScraper {
                             data[elementName] = await this.handleOnError(props, handleError);
                             handleErrorSuccess = true;
                         }
-                        // onHandleErrorFail
+                            // onHandleErrorFail
                         catch (err) {
                             console.error(`handleError Failed: ${elementName}`);
                             console.error(err);
@@ -179,6 +210,8 @@ class BaseScraper {
                 // if onError not defined, onUnhandledError must throw error
                 if (!handleErrorSuccess) {
                     try {
+                        // constructor creates default onunhandlederror
+                        // @ts-ignore
                         await this.config.onUnhandledError(props, defaultEventError);
                     } catch (err) {
                         console.error(err);
@@ -203,12 +236,14 @@ class BaseScraper {
                 if (Array.isArray(elemOrElems)) {
                     const resultTexts: string[] = [];
                     for (const elem of elemOrElems) {
-                        const text: string = await elem.evaluate(node => node.innerText);
+                        // @ts-ignore
+                        const text: string = await this.evaluateElement(elem, props.schema.from)
                         resultTexts.push(text);
                     }
                     return resultTexts;
                 } else {
-                    return await elemOrElems.evaluate(node => node.innerText);
+                    // @ts-ignore
+                    return await this.evaluateElement(elemOrElems, props.schema.from)
                 }
             case "Callback":
                 // @ts-ignore
@@ -237,14 +272,41 @@ class BaseScraper {
                 if (Array.isArray(elemOrElems)) {
                     const resultTexts: string[] = [];
                     for (const elem of elemOrElems) {
-                        const text: string = await elem.evaluate(node => node.innerText);
+                        // const text: string = await elem.evaluate(node => node.innerText);
+                        // @ts-ignore
+                        const text: string = await this.evaluateElement(elem, props.schema.from)
                         resultTexts.push(text);
                     }
                     return resultTexts;
                 } else {
-                    return await elemOrElems.evaluate(node => node.innerText);
+                    // return await elemOrElems.evaluate(node => node.innerText);
+                    // @ts-ignore
+                    return await this.evaluateElement(elemOrElems, props.schema.from)
                 }
             };
+        }
+    } // end createDefaultEvent
+
+    private async evaluateElement(element: ElementHandle, from: ElementFrom) {
+        if (!from.evaluate || from.evaluate === "Text") {
+            return await element.evaluate(node => node.innerText.trim());
+        }
+
+        if (from.evaluate === 'Html') {
+            return await element.evaluate(node => node.outerHTML.trim());
+        }
+
+        if (from.evaluate.getAttribute) {
+            return await element.evaluate((node, attr) => node.getAttribute(attr), from.evaluate.getAttribute);
+            // 예외상황. text도 아니면서 getattribute도 아닌 케이스엔 여기로 빠짐
+            // 언제든지 오류가 발생할 수 있는 상황임
+        } else {
+            const key: string = Object.keys(from.evaluate)[0];
+            // @ts-ignore
+            const value = from.evaluate[attributeKey];
+            return await element.evaluate((node, {key, value}) => {
+                return node[key](value);
+            }, {key, value});
         }
     }
 

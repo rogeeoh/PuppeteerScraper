@@ -33,7 +33,7 @@ const defaultSetting = {
     }),
     createDefaultFrom: (): any => ({
         context: 'Context',
-        evaluate: 'textContent',
+        evaluate: 'Text',
     }),
     createDefaultOnError: () => [],
 };

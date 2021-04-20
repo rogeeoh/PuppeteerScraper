@@ -1,8 +1,8 @@
-import BaseScraper from "../common/BaseScraper";
+import BaseScraper from "../../../src/common/BaseScraper";
 import puppeteer, {Browser, ElementHandle, Page} from 'puppeteer';
-import {ScraperConfig} from "../common/types";
-import ScraperSchema from "../common/elements";
-import yamlVerifier from "../utils/yamlVerifier";
+import {ScraperConfig} from "../../../src/common/types";
+import ScraperSchema from "../../../src/common/elements";
+import yamlVerifier from "../../../src/utils/yamlVerifier";
 
 const config: ScraperConfig = {
     browser: {

@@ -4,7 +4,7 @@ import ScraperSchema from "../../src/common/elements";
 describe("schema2.yaml 파싱 테스트", () => {
     let parsed: ScraperSchema;
     test('verify 테스트', () => {
-        parsed = verify('test/schemaTests/schema1.yaml')
+        parsed = verify('test/schemaTests/schema.yaml')
     });
 
     test("type 체크", () => {

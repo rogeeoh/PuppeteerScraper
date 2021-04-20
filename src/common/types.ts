@@ -1,11 +1,12 @@
 import {ElementFrom} from "./elements";
 import puppeteer, {Browser, ElementHandle, Frame, LaunchOptions, Page} from 'puppeteer';
+import {PendingXHR} from "pending-xhr-puppeteer";
 
 
 export type FromContextType = "Page" | "Context" | "Frame" | "Callback";
-export type EvaluateType = "textContent" | string;
+export type EvaluateType = "Text" | "Html" | {getAttribute: string} | {[key: string]: string};
 // string or getAttribute or evaluate
-export type EvaluateElement = "textContent" | ({getAttribute: string} | {evaluate: EvaluateType});
+// export type EvaluateElement = "textContent" | ({getAttribute: string} | {evaluate: EvaluateType});
 export type OnErrorPolicyType = "Alternative" | "Callback" | "StaticValue";
 export type ElementDataType = "String" | "Match" | "Date" | "Number" | "Integer";
 export type ElementObject = {[key: string]: ScraperElementType};
@@ -103,12 +104,20 @@ export type ScraperPropType = {
     schema: ScraperElementType;
 };
 
+export type CustomScraperConfig = {
+    browser?: ScraperBrowserConfig;
+    onCollecting?: OnCollectingType;
+    callback?: {[key: string]: (props: ScraperPropType) => Promise<any | any[]>};
+    onUnhandledError?: (props: ScraperPropType, error: any) => void,
+    options?: { debug: boolean, timeout: number};
+};
+
 export type ScraperConfig = {
     browser: ScraperBrowserConfig;
     onCollecting: OnCollectingType;
     callback: {[key: string]: (props: ScraperPropType) => Promise<any | any[]>};
     onUnhandledError: (props: ScraperPropType, error: any) => void,
-    options: { debug: boolean, timeout: number};
+    options?: { debug: boolean, timeout: number};
 };
 
 export type OnCollectingType = {[key: string]: OnCollectingTypeValue};
@@ -117,6 +126,7 @@ export type OnCollectingTypeValue = (props: ScraperPropType, event: any, element
 export type ScraperAsset = {
     browser: Browser;
     page: Page;
+    pendingXHR?: PendingXHR;
 };
 
 export type ScraperStatus = {

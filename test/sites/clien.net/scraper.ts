@@ -1,10 +1,12 @@
-import BaseScraper from "../common/BaseScraper";
+import BaseScraper from "../../../src/common/BaseScraper";
 import puppeteer, {Browser, ElementHandle, Page} from 'puppeteer';
-import {ScraperConfig, ScraperPropType} from "../common/types";
-import ScraperSchema from "../common/elements";
-import yamlVerifier from "../utils/yamlVerifier";
+import {CustomScraperConfig, ScraperPropType} from "../../../src/common/types";
+import ScraperSchema from "../../../src/common/elements";
+import yamlVerifier from "../../../src/utils/yamlVerifier";
+import {PendingXHR} from "pending-xhr-puppeteer";
 
-const config: ScraperConfig = {
+let pendingXHR: PendingXHR;
+const config: CustomScraperConfig = {
     browser: {
         // 사용할 브라우저 모듈, puppeteer-extra 등이 사용될 수 있음
         module: puppeteer,
@@ -24,6 +26,7 @@ const config: ScraperConfig = {
         afterLaunch: async (browser, page) => {
             // do something after browser launched
             console.log('after Launch!');
+            pendingXHR = new PendingXHR(page);
         },
         beforeClose: async (browser, page) => {
             // do something before browser terminates
@@ -39,25 +42,25 @@ const config: ScraperConfig = {
     },
     callback: {
         getLinkUrl: async ({page}) => page.url(),
-        onTitleError: async (props: ScraperPropType) => {
-            throw new Error('TitleError');
+        onDateError: async (props: ScraperPropType) => {
+            return 'UnknownDate';
         },
     },
-    // must return value or throw error?
+    // returns void
     onUnhandledError: async (props, error) => {
-        console.error(error);
-        // throw new Error(error);
+        console.error(`unhandlederror`);
     },
-    options: {
-        // console.log 출력 여부
-        debug: true,
-        // 프로그램이 3600초 (1시간)이상 동작하면 강제 종료
-        timeout: 60 * 60,
-    },
+    // TODO: 미완성
+    // options: {
+    //     // console.log 출력 여부
+    //     debug: true,
+    //     // 프로그램이 3600초 (1시간)이상 동작하면 강제 종료
+    //     timeout: 60 * 60,
+    // },
 };
 
 let pageNumber: number = 0;
-const scrapeSchema: ScraperSchema = yamlVerifier('./src/examples/schema1.yaml');
+const scrapeSchema: ScraperSchema = yamlVerifier('./test/sites/clien.net/schema.yaml');
 
 // https://www.clien.net/service/board/jirum?&od=T31&category=0&po=0
 const scrape = async (browser: Browser, page: Page, {collect, stop, delay}: any): Promise<void> => {
@@ -69,19 +72,21 @@ const scrape = async (browser: Browser, page: Page, {collect, stop, delay}: any)
     for (let i = 0; i < trLength; ++i) {
         trs = await page.$$('div.list_item.jirum');
         const tr: ElementHandle = trs[i];
-        // const titleElement: ElementHandle | null = await tr.$('span.list_subject > a');
-        // const title: string = await page.evaluate(elem => elem.textContent.trim(), titleElement);
-        // console.log(title);
-        let data = await collect(tr, 'main');
-        console.log(data);
+        const trData = await collect(tr, 'main');
+
         // @ts-ignore
-        // const subLink: ElementHandle = await tr.$('span.list_subject > a');
-        // await subLink.click();
-        // await delay(2000);
-        // await Promise.race([
-        //     page.waitForNavigation({waitUntil: "networkidle2"}),
-        //     this._pendingXHR.waitForAllXhrFinished(),
-        // ]);
+        const linkElem: ElementHandle = await tr.$('span.list_subject > a');
+        await linkElem.click();
+        await Promise.all([
+            delay(500),
+            pendingXHR.waitForAllXhrFinished(),
+        ]);
+
+        const subData = await collect(page, 'sub');
+        const data = {...trData, ...subData};
+
+        console.log(data);
+        await page.goto(`https://www.clien.net/service/board/jirum?&od=T31&category=0&po=${pageNumber}`, {waitUntil: "networkidle2"});
     }
     pageNumber += 1;
     if (pageNumber === 3){
